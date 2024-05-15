@@ -1,3 +1,15 @@
 export interface NativeAPIPlugin {
-  echo(options: { value: string }): Promise<{ value: string }>;
+  mtlsFetch(options: MtlsFetchOptions): Promise<MtlsFetchReturn>;
+
+  connectVPN():Promise<void>
+
 }
+
+export interface MtlsFetchOptions
+  {
+     method: string,url:string,body: string,clientCertificate:string,privateKey:string 
+    }
+
+    export interface MtlsFetchReturn
+    { success: boolean,statusCode:number,body:string }
+

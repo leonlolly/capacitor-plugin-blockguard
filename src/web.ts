@@ -1,10 +1,17 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { NativeAPIPlugin } from './definitions';
+import type { MtlsFetchOptions, MtlsFetchReturn, NativeAPIPlugin } from './definitions';
 
 export class NativeAPIWeb extends WebPlugin implements NativeAPIPlugin {
-  async echo(options: { value: string }): Promise<{ value: string }> {
-    console.log('ECHO', options);
-    return options;
+  mtlsFetch(options: MtlsFetchOptions): Promise<MtlsFetchReturn> {
+    if(options === undefined){
+      throw Error("options undefined")
+    }
+      throw this.unavailable('mtlsFetch API not available in browser');
   }
+  connectVPN(): Promise<void> {
+    throw this.unavailable('mtlsFetch API not available in browser');
+  }
+
 }
+
