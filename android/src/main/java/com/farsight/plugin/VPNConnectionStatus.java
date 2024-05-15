@@ -1,9 +1,10 @@
 package com.farsight.plugin;
 
-public interface VPNConnectionStatus {
+public class VPNConnectionStatus {
 
-    String status = null;
-    int incomingBytes = 0;
-    int outgoingBytes = 0;
+    public String status = null;
+    public long incomingBytes = 0;
+    public long outgoingBytes = 0;
+
 
 }

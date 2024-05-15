@@ -82,6 +82,20 @@ public class NativeAPIPlugin extends Plugin {
         disableVPNConnection(call);
 }
 
+
+    @PluginMethod
+    public void GetConnectionStatus(PluginCall call) {
+        Log.d("Blockguard", "GetConnectionStatus");
+        if (getPermissionState("internet") != PermissionState.GRANTED) {
+            Log.i("Blockguard", "GetConnectionStatus: Requesting internet permissions");
+            requestPermissionForAlias("internet", call, "internetPermissionCallback");
+            return;
+        }
+
+        Log.d("Blockguard", "GetConnectionStatus: internet permission available");
+        disableVPNConnection(call);
+    }
+
     @PermissionCallback
     private void internetPermissionCallback(PluginCall call) {
         if (getPermissionState("internet") == PermissionState.GRANTED) {
