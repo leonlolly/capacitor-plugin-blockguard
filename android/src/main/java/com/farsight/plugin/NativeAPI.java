@@ -5,6 +5,8 @@ import android.util.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
@@ -28,10 +30,14 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+import javax.net.ssl.KeyManager;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import okhttp3.MediaType;
@@ -45,53 +51,48 @@ public class NativeAPI {
 
     public MTLSFetchResponse mtlsFetch(String method,String url, String body,String clientCertificate ,String privateKey) {
         try {
-            String cleanPrivateKey = privateKey.replace("-----BEGIN PRIVATE KEY-----", "")
+
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+
+
+            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            trustStore.load(null, null);
+
+            String privateKeyContent = privateKey
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replaceAll(System.lineSeparator(), "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .trim();
+                    .replace("-----END PRIVATE KEY-----", "");
 
-            byte[] encoded = Base64.getDecoder().decode(cleanPrivateKey);
-
-            final CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-            final Collection<? extends Certificate> chain = certificateFactory.generateCertificates(new ByteArrayInputStream(clientCertificate.getBytes()));
-
-            PrivateKey generatePrivate = KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(encoded));
-
-            KeyStore clientKeyStore = KeyStore.getInstance("AndroidKeyStore");
-            clientKeyStore.load(null, null);
-            clientKeyStore.setKeyEntry("test", generatePrivate, null, chain.toArray(new Certificate[0]));
-
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509");
-            keyManagerFactory.init(clientKeyStore, null);
+            byte[] privateKeyAsBytes = Base64.getDecoder().decode(privateKeyContent);
+            KeyFactory keyFactory = KeyFactory.getInstance("EC");
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyAsBytes);
 
 
-            // Create Trust Manager that will accept self signed certificates.
+            byte[] clientCertificateBytes = clientCertificate.getBytes(StandardCharsets.UTF_8); // Specify encoding for clarity
+            InputStream certificateChainAsInputStream = new ByteArrayInputStream(clientCertificateBytes);
+            Certificate certificateChain = certificateFactory.generateCertificate(certificateChainAsInputStream);
 
-            X509TrustManager[] acceptAllTrustManager = {
-                    new X509TrustManager() {
-                        public X509Certificate[] getAcceptedIssuers() {
-                            return new X509Certificate[0];
-                        }
+            KeyStore identityStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            identityStore.load(null, null);
+            identityStore.setKeyEntry("client", keyFactory.generatePrivate(keySpec), null, new Certificate[]{certificateChain});
 
-                        public void checkClientTrusted(
-                                X509Certificate[] certs, String authType) {
-                        }
+            certificateChainAsInputStream.close();
 
-                        public void checkServerTrusted(
-                                X509Certificate[] certs, String authType) {
-                        }
-                    }
-            };
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-            // Initialize ssl context.
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(identityStore, null);
+            KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(keyManagerFactory.getKeyManagers(), acceptAllTrustManager, new SecureRandom());
+            sslContext.init(keyManagers, trustManagers, null);
 
-            X509TrustManager trustManager = acceptAllTrustManager[0];
+            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
             OkHttpClient client = new OkHttpClient.Builder()
-                    .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
+                    .sslSocketFactory(sslSocketFactory, (X509TrustManager) trustManagers[0])
                     .build();
 
             Request exactRequest;
