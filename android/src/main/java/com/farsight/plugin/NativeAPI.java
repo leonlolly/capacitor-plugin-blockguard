@@ -47,22 +47,23 @@ public class NativeAPI {
         try {
             String cleanPrivateKey = privateKey.replace("-----BEGIN PRIVATE KEY-----", "")
                     .replaceAll(System.lineSeparator(), "")
-                    .replace("-----END PRIVATE KEY-----", "");
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .trim();
 
             byte[] encoded = Base64.getDecoder().decode(cleanPrivateKey);
 
             final CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
             final Collection<? extends Certificate> chain = certificateFactory.generateCertificates(new ByteArrayInputStream(clientCertificate.getBytes()));
 
-            Key key = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(encoded));
+            PrivateKey generatePrivate = KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(encoded));
 
-            KeyStore clientKeyStore = KeyStore.getInstance("jks");
-            final char[] pwdChars = "1234".toCharArray();
+            KeyStore clientKeyStore = KeyStore.getInstance("AndroidKeyStore");
             clientKeyStore.load(null, null);
-            clientKeyStore.setKeyEntry("test", key, pwdChars, chain.toArray(new Certificate[0]));
+            clientKeyStore.setKeyEntry("test", generatePrivate, null, chain.toArray(new Certificate[0]));
 
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-            keyManagerFactory.init(clientKeyStore, pwdChars);
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509");
+            keyManagerFactory.init(clientKeyStore, null);
+
 
             // Create Trust Manager that will accept self signed certificates.
 
