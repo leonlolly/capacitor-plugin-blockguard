@@ -2,8 +2,6 @@ package com.farsight.plugin;
 
 import android.util.Log;
 
-import com.getcapacitor.PermissionState;
-import com.getcapacitor.PluginCall;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -47,88 +45,39 @@ public class NativeAPI {
 
     public MTLSFetchResponse mtlsFetch(String method,String url, String body,String clientCertificate ,String privateKey) {
         try {
-
-            String cleanPrivateKey = privateKey
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
+            String cleanPrivateKey = privateKey.replace("-----BEGIN PRIVATE KEY-----", "")
                     .replaceAll(System.lineSeparator(), "")
-                    .replaceAll("\\s*", "");
+                    .replace("-----END PRIVATE KEY-----", "");
 
-            String cleanclientCertificate = clientCertificate.trim()
-                    .replaceAll(System.lineSeparator(), "")
-                    .replaceAll("\\s*", "")
-                    .replace("-----BEGINCERTIFICATE-----","-----BEGIN CERTIFICATE-----"+"\n")
-                    .replace("-----ENDCERTIFICATE-----","\n"+"-----END CERTIFICATE-----");
-
-
-            byte[] encoded = new byte[0];
-
-            encoded = Base64.getDecoder().decode(cleanPrivateKey);
-
+            byte[] encoded = Base64.getDecoder().decode(cleanPrivateKey);
 
             final CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-            final Collection<? extends Certificate> chain = certificateFactory.generateCertificates(new ByteArrayInputStream(cleanclientCertificate.getBytes()));
+            final Collection<? extends Certificate> chain = certificateFactory.generateCertificates(new ByteArrayInputStream(clientCertificate.getBytes()));
 
+            Key key = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(encoded));
 
-            final int chainSize = chain.size();
-            final X509Certificate[] certArray = new X509Certificate[chainSize];
-            int i = 0;
-
-
-            String publicKey =
-                    "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwX/Kimdew0w4Ryw0a4uYlBiuhdE5D+R72wO/Zu/ySWdZLCE6zoUIZfwP46tBTFRGwfUwu1zDX6eQ8rFf8ul/gw==";
-
-
-            String cleanpublicKey = publicKey.trim()
-                    .replaceAll(System.lineSeparator(), "");
-
-            byte[] publicencoded = Base64.getDecoder().decode(cleanpublicKey);
-
-            X509EncodedKeySpec x509EncodedKeySpecPublic = new X509EncodedKeySpec(publicencoded);
-
-
-            PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(encoded);
-            KeyFactory ecdsa = KeyFactory.getInstance("EC"); //ecdsa = EC android
-
-            PrivateKey key = ecdsa.generatePrivate(pkcs8EncodedKeySpec);
-
-            PublicKey keyPublic = ecdsa.generatePublic(x509EncodedKeySpecPublic);
-
-            for (Certificate cert : chain) {
-                certArray[i++] = (X509Certificate) cert;
-                certArray[0].verify(keyPublic);
-
-            }
-
-
-
-
-
-
-
-
-
-            KeyStore clientKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            KeyStore clientKeyStore = KeyStore.getInstance("jks");
             final char[] pwdChars = "1234".toCharArray();
             clientKeyStore.load(null, null);
-            clientKeyStore.setKeyEntry("test", key, pwdChars, certArray);
+            clientKeyStore.setKeyEntry("test", key, pwdChars, chain.toArray(new Certificate[0]));
 
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("X509");
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
             keyManagerFactory.init(clientKeyStore, pwdChars);
 
             // Create Trust Manager that will accept self signed certificates.
 
-            TrustManager[] acceptAllTrustManager = {
+            X509TrustManager[] acceptAllTrustManager = {
                     new X509TrustManager() {
-
                         public X509Certificate[] getAcceptedIssuers() {
                             return new X509Certificate[0];
                         }
 
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        public void checkClientTrusted(
+                                X509Certificate[] certs, String authType) {
                         }
 
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        public void checkServerTrusted(
+                                X509Certificate[] certs, String authType) {
                         }
                     }
             };
@@ -138,12 +87,12 @@ public class NativeAPI {
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(keyManagerFactory.getKeyManagers(), acceptAllTrustManager, new SecureRandom());
 
-            TrustManager trustManager = acceptAllTrustManager[0];
+            X509TrustManager trustManager = acceptAllTrustManager[0];
 
             OkHttpClient client = new OkHttpClient.Builder()
-                    .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) trustManager)
-                    .hostnameVerifier((hostname, session) -> true)
+                    .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
                     .build();
+
             Request exactRequest;
             if (body.isEmpty()){
                 exactRequest = new Request.Builder()
@@ -185,12 +134,6 @@ public class NativeAPI {
                 | CertificateException e
         ) {
             Log.e("Blockguard", "mtlsFetch: Exception during certificate processing", e);
-            return new MTLSFetchResponse(false, -1, e.getMessage());} catch (SignatureException e) {
-            throw new RuntimeException(e);
-        } catch (InvalidKeyException e) {
-            throw new RuntimeException(e);
-        } catch (NoSuchProviderException e) {
-            throw new RuntimeException(e);
-        }
+            return new MTLSFetchResponse(false, -1, e.getMessage());}
     }
 }
