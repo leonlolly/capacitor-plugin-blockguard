@@ -1,21 +1,23 @@
 package com.farsight.plugin;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.net.VpnService;
+import android.os.Build;
+import android.system.ErrnoException;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
 
-import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -45,10 +48,15 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
-@CapacitorPlugin(name = "NativeAPI")
+@CapacitorPlugin(name = "NativeAPI", permissions = {@Permission(alias = NativeAPIPlugin.internet, strings = {Manifest.permission.INTERNET})})
 public class NativeAPIPlugin extends Plugin {
     private MyVpnService vpnService;
+
+    private NativeAPI nativeAPI = new NativeAPI();
+
+    public static final String internet = "INTERNET";
 
     @Override
     public void load() {
@@ -59,9 +67,9 @@ public class NativeAPIPlugin extends Plugin {
     @PluginMethod
     public void connectVPN(PluginCall call) {
         Log.d("Blockguard", "connectVPN: Initiated");
-        if (getPermissionState("internet") != PermissionState.GRANTED) {
+        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
             Log.i("Blockguard", "connectVPN: Requesting internet permissions");
-            requestPermissionForAlias("internet", call, "internetPermissionCallback");
+            requestPermissionForAlias(NativeAPIPlugin.internet, call, "internetPermissionCallback");
             return;
         }
 
@@ -72,38 +80,39 @@ public class NativeAPIPlugin extends Plugin {
     @PluginMethod
     public void disconnectVPN(PluginCall call) {
         Log.d("Blockguard", "connectVPN: Initiated");
-        if (getPermissionState("internet") != PermissionState.GRANTED) {
-        Log.i("Blockguard", "connectVPN: Requesting internet permissions");
-        requestPermissionForAlias("internet", call, "internetPermissionCallback");
-        return;
-    }
-
-        Log.d("Blockguard", "disconnectVPN: internet permission available");
-        disableVPNConnection(call);
-}
-
-
-    @PluginMethod
-    public void GetConnectionStatus(PluginCall call) {
-        Log.d("Blockguard", "GetConnectionStatus");
-        if (getPermissionState("internet") != PermissionState.GRANTED) {
-            Log.i("Blockguard", "GetConnectionStatus: Requesting internet permissions");
-            requestPermissionForAlias("internet", call, "internetPermissionCallback");
+        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+            Log.i("Blockguard", "connectVPN: Requesting internet permissions");
+            requestPermissionForAlias(NativeAPIPlugin.internet, call, "internetPermissionCallback");
             return;
         }
 
-        Log.d("Blockguard", "GetConnectionStatus: internet permission available");
+        Log.d("Blockguard", "disconnectVPN: internet permission available");
         disableVPNConnection(call);
+    }
+
+
+    @PluginMethod
+    public VPNConnectionStatus getConnectionStatus(PluginCall call) throws ErrnoException {
+        Log.d("Blockguard", "GetConnectionStatus");
+        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+            Log.i("Blockguard", "GetConnectionStatus: Requesting internet permissions");
+            requestPermissionForAlias(NativeAPIPlugin.internet, call, "internetPermissionCallback");
+
+        }
+        return vpnService.getConnectionStatus();
+    }
+
+    private void requestInternet(PluginCall call) {
+
+        requestPermissionForAlias(NativeAPIPlugin.internet, call, "internetPermissionCallback");
     }
 
     @PermissionCallback
     private void internetPermissionCallback(PluginCall call) {
-        if (getPermissionState("internet") == PermissionState.GRANTED) {
+        if (getPermissionState(NativeAPIPlugin.internet) == PermissionState.GRANTED) {
             Log.w("Blockguard", "internetPermissionCallback: Request granted");
-            prepareVPNConnection(call);
             return;
         }
-
         Log.w("Blockguard", "internetPermissionCallback: Request rejected");
         call.reject("The app needs permissions to access the internet to continue!");
     }
@@ -117,7 +126,6 @@ public class NativeAPIPlugin extends Plugin {
             getContext().startActivity(prepareIntent);
         } else {
             Log.d("Blockguard", "prepareVPNConnection: Already prepared");
-            launchVpnService(call);
         }
     }
 
@@ -164,96 +172,36 @@ public class NativeAPIPlugin extends Plugin {
         call.resolve();
     }
 
-    @PluginMethod
-    public static MTLSFetchResponse mtlsFetch(PluginCall call) {
-        try {
-            Log.i("Blockguard", "mtlsFetch: Starting");
 
-            String method = call.getString("method");
-            String url = call.getString("url");
-            String body = call.getString("body");
-            String clientCertificate = call.getString("clientCertificate");
-            String privateKey = call.getString("privateKey");
+    @PluginMethod()
+    public MTLSFetchResponse mtlsFetch(PluginCall call) {
+        Log.i("Blockguard", "mtlsFetch: Starting");
+
+        String method = call.getString("method");
+        String url = call.getString("url");
+        String body = call.getString("body");
+        String clientCertificate = call.getString("clientCertificate");
+        String privateKey = call.getString("privateKey");
 
 
-            String cleanPrivateKey = privateKey
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replaceAll(System.lineSeparator(), "")
-                .replace("-----END PRIVATE KEY-----", "");
+        if (clientCertificate == null || privateKey == null || method == null || url == null || body == null) {
+            call.reject("clientCertificate missing");
+            return new MTLSFetchResponse(false, -1, "input missing");
+        }
+        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+            Log.i("Blockguard", "mtlsFetch: requestPermissions");
+            requestPermissions(call);
+        }
+        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+            Log.i("Blockguard", "mtlsFetch: requestPermissions failed");
+            return new MTLSFetchResponse(false, 500, "no internet permission");
+        }
+        Log.i("Blockguard", method);
+        Log.i("Blockguard", url);
+        Log.i("Blockguard", body);
+        Log.i("Blockguard", clientCertificate);
+        Log.i("Blockguard", privateKey);
+        return nativeAPI.mtlsFetch(method, url, body, clientCertificate, privateKey);
 
-            byte[] encoded = new byte[0];
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                encoded = Base64.getDecoder().decode(cleanPrivateKey);
-            } else {
-                encoded = android.util.Base64.decode(cleanPrivateKey, android.util.Base64.DEFAULT);
-            }
-
-            final CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-            final Collection<? extends Certificate> chain = certificateFactory.generateCertificates(
-                new ByteArrayInputStream(clientCertificate.getBytes())
-            );
-
-            Key key = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(encoded));
-
-            KeyStore clientKeyStore = KeyStore.getInstance("jks");
-            final char[] pwdChars = "1234".toCharArray();
-            clientKeyStore.load(null, null);
-            clientKeyStore.setKeyEntry("test", key, pwdChars, chain.toArray(new Certificate[0]));
-
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-            keyManagerFactory.init(clientKeyStore, pwdChars);
-
-            // Create Trust Manager that will accept self signed certificates.
-
-            TrustManager[] acceptAllTrustManager = {
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() {
-                        return new X509Certificate[0];
-                    }
-
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
-            };
-
-            // Initialize ssl context.
-
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(keyManagerFactory.getKeyManagers(), acceptAllTrustManager, new java.security.SecureRandom());
-
-            OkHttpClient client = new OkHttpClient.Builder()
-                .sslSocketFactory(sslContext.getSocketFactory(), (X509TrustManager) sslContext.getSocketFactory())
-                .hostnameVerifier((hostname, session) -> true)
-                .build();
-
-            Request exactRequest = new Request.Builder()
-                .url(url)
-                .method(method, RequestBody.create(body, MediaType.parse("text/plain")))
-                .build();
-
-            try (Response exactResponse = client.newCall(exactRequest).execute()) {
-                if (exactResponse.code() < 200 || exactResponse.code() > 299) {
-                    Log.w("Blockguard", "mtlsFetch: Response code: " + exactResponse.code());
-                    return new MTLSFetchResponse(false, exactResponse.code(), "");
-                }
-                String responseBody = exactResponse.body().string();
-                Log.d("Blockguard", "mtlsFetch: Response code: " + exactResponse.code() + ", Body: " + responseBody.substring(0, Math.min(responseBody.length(), 100)));
-                return new MTLSFetchResponse(true, exactResponse.code(), exactResponse.body().string());
-            } catch (IOException e) {
-                Log.e("Blockguard", "mtlsFetch: IOException", e);
-                return new MTLSFetchResponse(false, -1, e.getMessage());
-            }
-        } catch (
-            UnrecoverableKeyException
-            | KeyManagementException
-            | InvalidKeySpecException
-            | NoSuchAlgorithmException
-            | KeyStoreException
-            | IOException
-            | CertificateException e
-        ) {
-            Log.e("Blockguard", "mtlsFetch: Exception during certificate processing", e);
-            return new MTLSFetchResponse(false, -1, e.getMessage());}
     }
 }

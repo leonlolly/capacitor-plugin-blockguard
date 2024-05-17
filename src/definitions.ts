@@ -6,7 +6,7 @@ export interface NativeAPIPlugin {
 
   disconnectVPN(): Promise<void>
 
-  getConnectionStatus(): Promise<void>
+  getConnectionStatus(): Promise<ConnectionStatus>
 
   mtlsFetch(options: MtlsFetchOptions): Promise<MtlsFetchReturn>;
 

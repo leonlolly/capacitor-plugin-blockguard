@@ -13,14 +13,59 @@ npx cap sync
 
 <docgen-index>
 
+* [`getVPNClientStatus()`](#getvpnclientstatus)
+* [`connectVPN(...)`](#connectvpn)
+* [`disconnectVPN()`](#disconnectvpn)
+* [`getConnectionStatus()`](#getconnectionstatus)
 * [`mtlsFetch(...)`](#mtlsfetch)
-* [`connectVPN()`](#connectvpn)
 * [Interfaces](#interfaces)
 
 </docgen-index>
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
+
+### getVPNClientStatus()
+
+```typescript
+getVPNClientStatus() => Promise<void>
+```
+
+--------------------
+
+
+### connectVPN(...)
+
+```typescript
+connectVPN(options: ConnectVPNOptions) => Promise<void>
+```
+
+| Param         | Type                                                            |
+| ------------- | --------------------------------------------------------------- |
+| **`options`** | <code><a href="#connectvpnoptions">ConnectVPNOptions</a></code> |
+
+--------------------
+
+
+### disconnectVPN()
+
+```typescript
+disconnectVPN() => Promise<void>
+```
+
+--------------------
+
+
+### getConnectionStatus()
+
+```typescript
+getConnectionStatus() => Promise<ConnectionStatus>
+```
+
+**Returns:** <code>Promise&lt;<a href="#connectionstatus">ConnectionStatus</a>&gt;</code>
+
+--------------------
+
 
 ### mtlsFetch(...)
 
@@ -37,16 +82,27 @@ mtlsFetch(options: MtlsFetchOptions) => Promise<MtlsFetchReturn>
 --------------------
 
 
-### connectVPN()
-
-```typescript
-connectVPN() => Promise<void>
-```
-
---------------------
-
-
 ### Interfaces
+
+
+#### ConnectVPNOptions
+
+| Prop                    | Type                |
+| ----------------------- | ------------------- |
+| **`method`**            | <code>string</code> |
+| **`url`**               | <code>string</code> |
+| **`body`**              | <code>string</code> |
+| **`clientCertificate`** | <code>string</code> |
+| **`privateKey`**        | <code>string</code> |
+
+
+#### ConnectionStatus
+
+| Prop                | Type                |
+| ------------------- | ------------------- |
+| **`status`**        | <code>string</code> |
+| **`incomingBytes`** | <code>number</code> |
+| **`outgoingBytes`** | <code>number</code> |
 
 
 #### MtlsFetchReturn
