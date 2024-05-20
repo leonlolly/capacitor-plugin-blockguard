@@ -43,13 +43,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
-
 @CapacitorPlugin(name = "NativeAPI", permissions = {@Permission(alias = NativeAPIPlugin.internet, strings = {Manifest.permission.INTERNET})})
 public class NativeAPIPlugin extends Plugin {
     private MyVpnService vpnService;

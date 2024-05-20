@@ -3,9 +3,12 @@ package com.farsight.plugin;
 import android.util.Log;
 
 
+import org.apache.http.conn.ssl.DefaultHostnameVerifier;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -30,6 +33,9 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -39,13 +45,6 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 public class NativeAPI {
 
@@ -91,37 +90,35 @@ public class NativeAPI {
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .sslSocketFactory(sslSocketFactory, (X509TrustManager) trustManagers[0])
-                    .build();
 
-            Request exactRequest;
-            if (body.isEmpty()){
-                exactRequest = new Request.Builder()
-                        .url(url)
-                        .method(method, null) // Remove RequestBody argument for GET
-                        .build();
-            }
-            else {
-                exactRequest = new Request.Builder()
-                        .url(url)
-                        .method(method, RequestBody.create(body, MediaType.parse("text/plain")))
-                        .build();
-            }
-            try (Response exactResponse = client.newCall(exactRequest).execute()) {
-                if (exactResponse.code() < 200 || exactResponse.code() > 299) {
-                    Log.w("Blockguard", "mtlsFetch: Response code: " + exactResponse.code());
-                    return new MTLSFetchResponse(false, exactResponse.code(), "");
+
+            HttpsURLConnection ctx = null;
+            InputStream o = null;
+
+            try  {
+                URL url2 = new URL(url);
+                ctx = (HttpsURLConnection) url2.openConnection();
+                ctx.setRequestMethod(method);
+                ctx.setAllowUserInteraction(true);
+                ctx.setHostnameVerifier(new DefaultHostnameVerifier());
+                ctx.setSSLSocketFactory(sslContext.getSocketFactory());
+
+
+
+                if (ctx.getResponseCode() < 200 || ctx.getResponseCode() > 299) {
+                    Log.w("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode());
+                    return new MTLSFetchResponse(false, ctx.getResponseCode(), "");
                 }
-                ResponseBody responseBody = exactResponse.body();
-                if (responseBody == null) {
-                    Log.d("Blockguard", "mtlsFetch: Response code: " + exactResponse.code() + ", Body: responseBody is empty");
-                    return new MTLSFetchResponse(true, exactResponse.code(), "responseBody is empty");
-                } else {
-                    String responseBodystring = responseBody.string();
-                    Log.d("Blockguard", "mtlsFetch: Response code: " + exactResponse.code() + ", Body: " + responseBodystring);
-                    return new MTLSFetchResponse(true, exactResponse.code(), responseBodystring);
-                }
+
+                o = ctx.getInputStream();
+                byte[] bytes = new byte[o.available()];
+                o.read(bytes);
+                String responseString = new String(bytes);
+
+
+                    Log.d("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode() + ", Body: " + responseString);
+                    return new MTLSFetchResponse(true, ctx.getResponseCode() , responseString);
+
             } catch (IOException e) {
                 Log.e("Blockguard", "mtlsFetch: IOException", e);
                 return new MTLSFetchResponse(false, -1, e.getMessage());
