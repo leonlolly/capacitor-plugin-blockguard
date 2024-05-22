@@ -9,11 +9,14 @@ import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509ContentVerifierProviderBuilder;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
@@ -25,11 +28,13 @@ import org.bouncycastle.jce.spec.ECPrivateKeySpec;
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.bc.BcECContentSignerBuilder;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.util.encoders.Hex;
 
 
@@ -51,6 +56,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.UnrecoverableKeyException;
@@ -69,6 +75,10 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
+
+import java.security.cert.X509Certificate;
+import java.util.Locale;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -95,83 +105,46 @@ public class NativeAPI {
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyAsBytes);
             PrivateKey privateKey = keyFactory.generatePrivate(keySpec);
 
-            // Create an ECNamedCurveParameterSpec object
-            ECNamedCurveParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256r1");
-
-// Create an ECGenParameterSpec object based on the ECNamedCurveParameterSpec object
-            ECGenParameterSpec ecGenSpec = new ECGenParameterSpec(ecSpec.getName());
-
-// Initialize the KeyPairGenerator object with the ECGenParameterSpec object
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC", "BC");
-            keyPairGenerator.initialize(ecGenSpec);
-            KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-            // Extract the private key
-            PrivateKey ecPrivateKey = keyPair.getPrivate();
-
             String certContent = clientCertificate
                     .replace("-----BEGIN CERTIFICATE-----", "")
                     .replaceAll(System.lineSeparator(), "")
                     .replace("-----END CERTIFICATE-----", "");
 
 
-            byte[] clientCertificateBytes = Base64.getDecoder().decode(certContent); // Specify encoding for clarity
 
             ASN1ObjectIdentifier asn1ObjectIdentifier = new ASN1ObjectIdentifier("1.3.6.1.5.5.7.3.2");
-            Extension ex = Extension.create(asn1ObjectIdentifier, false, asn1ObjectIdentifier.toASN1Primitive());
+            Extension clientAuthExtention = Extension.create(asn1ObjectIdentifier, false, asn1ObjectIdentifier.toASN1Primitive());
 
-            X509CertificateHolder x509CertificateHolder = new X509CertificateHolder(clientCertificateBytes);
-            X509v3CertificateBuilder certificateBuilder = new X509v3CertificateBuilder(x509CertificateHolder);
-
-            certificateBuilder.addExtension(ex);
-
-            if(!certificateBuilder.hasExtension(Extension.keyUsage)){
-                throw new RuntimeException();
-            };
-            if(!certificateBuilder.hasExtension(new ASN1ObjectIdentifier("1.3.6.1.5.5.7.3.2"))){
-                throw new RuntimeException();
-            };
-            if(!certificateBuilder.hasExtension(Extension.extendedKeyUsage)){
-                throw new RuntimeException();
-            };
-            if(!certificateBuilder.hasExtension(Extension.basicConstraints)){
-                throw new RuntimeException();
-            };
+            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+            X509Certificate originalCert = (X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(clientCertificate.getBytes()));
 
 
+            PublicKey publicKey = originalCert.getPublicKey();
+            SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
 
+            X500Name issuerSubjectName = new X500Name(originalCert.getSubjectX500Principal().getName());
 
+            boolean isSelfSigned = originalCert.getSubjectX500Principal().equals(originalCert.getIssuerX500Principal());
 
-            AlgorithmIdentifier signatureAlgorithm = new DefaultSignatureAlgorithmIdentifierFinder().find(
-                    "SHA256withECDSA");
-
-            AlgorithmIdentifier digestAlgorithm = new DefaultDigestAlgorithmIdentifierFinder().find(signatureAlgorithm);
-            BcECContentSignerBuilder bcECContentSignerBuilder = new BcECContentSignerBuilder(signatureAlgorithm,digestAlgorithm);
-            bcECContentSignerBuilder.setSecureRandom(new SecureRandom());
-
-
-            privateToExplicitParameters(ecPrivateKey, "BC");
-
-            if (!(ecPrivateKey instanceof ECPrivateKey ecPrivateKeycast)) {
-                throw new InvalidKeySpecException();
+            if(!isSelfSigned){
+                throw new Exception("lol");
             }
 
-            ECPrivateKeySpec ecPrivateKeySpec = new ECPrivateKeySpec(ecPrivateKeycast.getD(), ecSpec);
-
-            ECCurve curve = ecSpec.getCurve();
-            ECPoint G = curve.decodePoint(
-                    Hex.decode("046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5")
-            );
-            BigInteger n = new BigInteger("115792089210356248762697446949407573530086143415290314195533631308867097853951");
-
-            ECDomainParameters ecDomainParameters = new ECDomainParameters(curve, G, n);
+            ContentSigner certSigner = new JcaContentSignerBuilder("SHA256withECDSA")
+                    .build(privateKey);
 
 
-            ECPrivateKeyParameters ecPrivateKeyParameters = new ECPrivateKeyParameters(ecPrivateKeySpec.getD(),ecDomainParameters);
+            X509v3CertificateBuilder certificateBuilder = new X509v3CertificateBuilder(
+                    new X500Name(originalCert.getIssuerX500Principal().getName()),
+                    originalCert.getSerialNumber(),
+                    originalCert.getNotBefore(),
+                    originalCert.getNotAfter(),
+                    new X500Name(originalCert.getSubjectX500Principal().getName()),
+                    publicKeyInfo);
 
-            ContentSigner contentSigner = bcECContentSignerBuilder.build(ecPrivateKeyParameters);
+            certificateBuilder.addExtension(clientAuthExtention);
 
-            X509CertificateHolder x509CertificateHolderNew = certificateBuilder.build(contentSigner);
+            X509CertificateHolder x509CertificateHolderNew = certificateBuilder.build(certSigner);
 
             Extensions extensions = x509CertificateHolderNew.getExtensions();
 
@@ -232,15 +205,11 @@ public class NativeAPI {
 //                return new MTLSFetchResponse(false, -1, e.getMessage());
             }
          catch (
-                 InvalidKeySpecException
-                 | NoSuchAlgorithmException
-                 | IOException e
+                 InvalidKeySpecException | NoSuchAlgorithmException | IOException |
+                 CertificateException e
         ) {
             Log.e("Blockguard", "mtlsFetch: Exception during certificate processing", e);
-            return new MTLSFetchResponse(false, -1, e.getMessage());} catch (
-                OperatorCreationException | NoSuchProviderException e) {
-            throw new RuntimeException(e);
-        } catch (InvalidAlgorithmParameterException e) {
+            return new MTLSFetchResponse(false, -1, e.getMessage());} catch (Exception e) {
             throw new RuntimeException(e);
         }
         return null;
