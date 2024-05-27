@@ -41,7 +41,7 @@ public class ExampleInstrumentedTest {
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
         // Replace with your actual values
-        String url = "https://provider.dweb.computer:8443/lease/65048045/1/1/status";
+        String url = "https://certauth.cryptomix.com/json/";
         String method = "GET";
         String body = "";
         String clientCertificate = "-----BEGIN CERTIFICATE-----\n" +
