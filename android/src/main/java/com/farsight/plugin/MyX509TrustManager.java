@@ -6,19 +6,19 @@ import java.security.KeyStore;
 import java.security.cert.CertificateException;
 
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
+
 import java.security.cert.X509Certificate;
 
 @SuppressLint("CustomX509TrustManager")
-class MyTrustManager implements X509TrustManager
+class X509TrustManager implements javax.net.ssl.X509TrustManager
 {
 
-    private final X509TrustManager trustManager;
+    private final javax.net.ssl.X509TrustManager trustManager;
 
-    public MyTrustManager(KeyStore keyStore) throws Exception {
+    public X509TrustManager(KeyStore keyStore) throws Exception {
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(keyStore);
-        trustManager = (X509TrustManager) tmf.getTrustManagers()[0];
+        trustManager = (javax.net.ssl.X509TrustManager) tmf.getTrustManagers()[0];
     }
 
     @SuppressLint("TrustAllX509TrustManager")

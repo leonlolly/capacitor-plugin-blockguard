@@ -3,12 +3,9 @@ package com.farsight.plugin;
 import android.annotation.SuppressLint;
 import android.util.Log;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -16,7 +13,6 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.Principal;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -30,13 +26,11 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
 
 
 public class NativeAPI {
 
-    public MTLSFetchResponse mtlsFetch(String method,String url, String body,String clientCertificate ,String privateKey) {
+    public MTLSFetchResponse mtlsFetch(String method, String url, String body, String clientCertificate, String privateKey) {
         try {
             System.setProperty("javax.net.debug", "all");
 
@@ -63,7 +57,7 @@ public class NativeAPI {
 
             certificateChainAsInputStream.close();
 
-            X509TrustManager trustManager = new MyTrustManager(keyStore);
+            javax.net.ssl.X509TrustManager trustManager = new X509TrustManager(keyStore);
 
 
             TrustManager[] trustManagers = {trustManager};
@@ -73,17 +67,18 @@ public class NativeAPI {
                 @Override
                 public boolean verify(String hostname, SSLSession session) {
                     return true;
-                }};
+                }
+            };
 
             SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
-            sslContext.init(null,trustManagers, null);
+            sslContext.init(null, trustManagers, null);
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
             HttpsURLConnection ctx = null;
             InputStream o = null;
 
-            try  {
+            try {
                 URL url2 = new URL(url);
                 ctx = (HttpsURLConnection) url2.openConnection();
                 ctx.setRequestMethod(method);
@@ -93,7 +88,6 @@ public class NativeAPI {
                 ctx.connect();
 
                 int responseCode = ctx.getResponseCode();
-
 
 
                 if (responseCode < 200 || responseCode > 299) {
@@ -106,8 +100,8 @@ public class NativeAPI {
                 String responseString = new String(bytes);
 
 
-                    Log.d("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode() + ", Body: " + responseString);
-                    return new MTLSFetchResponse(true, ctx.getResponseCode() , responseString);
+                Log.d("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode() + ", Body: " + responseString);
+                return new MTLSFetchResponse(true, ctx.getResponseCode(), responseString);
 
             } catch (IOException e) {
                 Log.e("Blockguard", "mtlsFetch: IOException", e);
@@ -122,7 +116,8 @@ public class NativeAPI {
                 | CertificateException e
         ) {
             Log.e("Blockguard", "mtlsFetch: Exception during certificate processing", e);
-            return new MTLSFetchResponse(false, -1, e.getMessage());} catch (Exception e) {
+            return new MTLSFetchResponse(false, -1, e.getMessage());
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
