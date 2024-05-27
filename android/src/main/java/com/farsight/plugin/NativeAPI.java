@@ -2,8 +2,7 @@ package com.farsight.plugin;
 
 import android.util.Log;
 
-
-import org.apache.http.conn.ssl.DefaultHostnameVerifier;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -40,21 +39,24 @@ import javax.net.ssl.KeyManager;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import okhttp3.internal.tls.OkHostnameVerifier;
+
 public class NativeAPI {
 
     public MTLSFetchResponse mtlsFetch(String method,String url, String body,String clientCertificate ,String privateKey) {
         try {
 
-            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509", BouncyCastleProvider.PROVIDER_NAME);
 
 
-            KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(null, null);
 
             String privateKeyContent = privateKey
@@ -63,7 +65,7 @@ public class NativeAPI {
                     .replace("-----END PRIVATE KEY-----", "");
 
             byte[] privateKeyAsBytes = Base64.getDecoder().decode(privateKeyContent);
-            KeyFactory keyFactory = KeyFactory.getInstance("EC");
+            KeyFactory keyFactory = KeyFactory.getInstance("EC", BouncyCastleProvider.PROVIDER_NAME);
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyAsBytes);
 
 
@@ -77,18 +79,20 @@ public class NativeAPI {
 
             certificateChainAsInputStream.close();
 
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm(), BouncyCastleProvider.PROVIDER_NAME);
             trustManagerFactory.init(trustStore);
             TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
 
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm(), BouncyCastleProvider.PROVIDER_NAME);
             keyManagerFactory.init(identityStore, null);
             KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
 
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(keyManagers, trustManagers, null);
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+            sslContext.init(keyManagers, null, null);
 
-            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+            SSLSocketFactory sslSocketFactory =(SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket socket = (SSLSocket)sslSocketFactory.createSocket();
+
 
 
 
@@ -100,8 +104,8 @@ public class NativeAPI {
                 ctx = (HttpsURLConnection) url2.openConnection();
                 ctx.setRequestMethod(method);
                 ctx.setAllowUserInteraction(true);
-                ctx.setHostnameVerifier(new DefaultHostnameVerifier());
                 ctx.setSSLSocketFactory(sslContext.getSocketFactory());
+                ctx.connect();
 
 
 
@@ -112,7 +116,6 @@ public class NativeAPI {
 
                 o = ctx.getInputStream();
                 byte[] bytes = new byte[o.available()];
-                o.read(bytes);
                 String responseString = new String(bytes);
 
 
@@ -133,6 +136,9 @@ public class NativeAPI {
                 | CertificateException e
         ) {
             Log.e("Blockguard", "mtlsFetch: Exception during certificate processing", e);
-            return new MTLSFetchResponse(false, -1, e.getMessage());}
+            return new MTLSFetchResponse(false, -1, e.getMessage());} catch (
+                NoSuchProviderException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
