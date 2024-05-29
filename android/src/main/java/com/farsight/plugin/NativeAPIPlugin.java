@@ -194,7 +194,7 @@ public class NativeAPIPlugin extends Plugin {
         Log.i("Blockguard", body);
         Log.i("Blockguard", clientCertificate);
         Log.i("Blockguard", privateKey);
-        return nativeAPI.mtlsFetch(method, url, body, clientCertificate, privateKey);
+        return nativeAPI.mtlsFetch(method, url, body);
 
     }
 }
