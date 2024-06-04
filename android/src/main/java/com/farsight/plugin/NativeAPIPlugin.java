@@ -165,36 +165,42 @@ public class NativeAPIPlugin extends Plugin {
         call.resolve();
     }
 
-
-    @PluginMethod()
-    public MTLSFetchResponse mtlsFetch(PluginCall call) {
-        Log.i("Blockguard", "mtlsFetch: Starting");
-
-        String method = call.getString("method");
-        String url = call.getString("url");
-        String body = call.getString("body");
-        String clientCertificate = call.getString("clientCertificate");
-        String privateKey = call.getString("privateKey");
-
-
-        if (clientCertificate == null || privateKey == null || method == null || url == null || body == null) {
-            call.reject("clientCertificate missing");
-            return new MTLSFetchResponse(false, -1, "input missing");
-        }
-        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
-            Log.i("Blockguard", "mtlsFetch: requestPermissions");
-            requestPermissions(call);
-        }
-        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
-            Log.i("Blockguard", "mtlsFetch: requestPermissions failed");
-            return new MTLSFetchResponse(false, 500, "no internet permission");
-        }
-        Log.i("Blockguard", method);
-        Log.i("Blockguard", url);
-        Log.i("Blockguard", body);
-        Log.i("Blockguard", clientCertificate);
-        Log.i("Blockguard", privateKey);
-        return nativeAPI.mtlsFetch(method, url, body);
-
-    }
+//
+//    @PluginMethod()
+//    public MTLSFetchResponse mtlsFetch(PluginCall call) {
+//        Log.i("Blockguard", "mtlsFetch: Starting");
+//
+//        String method = call.getString("method");
+//        String url = call.getString("url");
+//        String body = call.getString("body");
+//        String clientCertificate = call.getString("clientCertificate");
+//        String privateKey = call.getString("privateKey");
+//
+//
+//        if (clientCertificate == null || privateKey == null || method == null || url == null || body == null) {
+//            call.reject("clientCertificate missing");
+//            return new MTLSFetchResponse(false, -1, "input missing");
+//        }
+//        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+//            Log.i("Blockguard", "mtlsFetch: requestPermissions");
+//            requestPermissions(call);
+//        }
+//        if (getPermissionState(NativeAPIPlugin.internet) != PermissionState.GRANTED) {
+//            Log.i("Blockguard", "mtlsFetch: requestPermissions failed");
+//            return new MTLSFetchResponse(false, 500, "no internet permission");
+//        }
+//        Log.i("Blockguard", method);
+//        Log.i("Blockguard", url);
+//        Log.i("Blockguard", body);
+//        Log.i("Blockguard", clientCertificate);
+//        Log.i("Blockguard", privateKey);
+//        try {
+//            return nativeAPI.mtlsFetch(method, url, body,1);
+//        }
+//        catch (Exception e){
+//            throw new RuntimeException(e);
+//        }
+//
+//
+//    }
 }
