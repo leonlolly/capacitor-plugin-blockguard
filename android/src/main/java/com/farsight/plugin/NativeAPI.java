@@ -2,9 +2,11 @@ package com.farsight.plugin;
 
 import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -25,6 +27,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
@@ -62,9 +65,9 @@ public class NativeAPI {
             CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509" );
             byte[] clientCertificateBytes = certificateString.getBytes(StandardCharsets.UTF_8);
             InputStream certificateChainAsInputStream = new ByteArrayInputStream(clientCertificateBytes);
-            X509Certificate originalCert = (X509Certificate) certificateFactory.generateCertificate(certificateChainAsInputStream);
+            Certificate originalCert = certificateFactory.generateCertificate(certificateChainAsInputStream);
 
-            this.keyStore.setKeyEntry(this.alias, privateKey, null, new X509Certificate[]{originalCert});
+            this.keyStore.setKeyEntry(this.alias, privateKey, null, new Certificate[]{originalCert});
         }
         catch (Exception e){
             Log.e("Blockguard", "storePrivateKey: ", e);
@@ -157,7 +160,10 @@ public class NativeAPI {
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
 
-            sslContext.init(null, trustManagers, null);
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(this.keyStore, null);
+
+            sslContext.init(keyManagerFactory.getKeyManagers(), trustManagers, null);
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
@@ -181,13 +187,21 @@ public class NativeAPI {
                     return new MTLSFetchResponse(false, ctx.getResponseCode(), "");
                 }
 
-                o = ctx.getInputStream();
-                byte[] bytes = new byte[o.available()];
-                String responseString = new String(bytes);
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader in = new BufferedReader(new InputStreamReader(ctx.getInputStream()))) {
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                } catch (Exception e) {
+                    Log.e("Blockguard", "Error reading response", e);
+                    return new MTLSFetchResponse(false, responseCode, "");
+                }
+                String res = response.toString();
 
 
-                Log.d("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode() + ", Body: " + responseString);
-                return new MTLSFetchResponse(true, ctx.getResponseCode(), responseString);
+                Log.d("Blockguard", "mtlsFetch: Response code: " + ctx.getResponseCode() + ", Body: " + res);
+                return new MTLSFetchResponse(true, ctx.getResponseCode(), res);
 
             } catch (IOException e) {
                 Log.e("Blockguard", "mtlsFetch: IOException", e);

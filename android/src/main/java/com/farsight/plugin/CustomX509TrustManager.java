@@ -1,9 +1,11 @@
 package com.farsight.plugin;
 
 import android.annotation.SuppressLint;
+import android.util.Log;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 
 @SuppressLint("CustomX509TrustManager")
 class CustomX509TrustManager implements javax.net.ssl.X509TrustManager
@@ -12,7 +14,6 @@ class CustomX509TrustManager implements javax.net.ssl.X509TrustManager
     private X509Certificate trustedCert;
 
     public CustomX509TrustManager(X509Certificate x509Certificate) throws Exception {
-        trustedCert = x509Certificate;
     }
 
     @SuppressLint("TrustAllX509TrustManager")
@@ -20,11 +21,15 @@ class CustomX509TrustManager implements javax.net.ssl.X509TrustManager
     public void checkClientTrusted(X509Certificate[] chain, String authType)
             throws CertificateException
     {
+        Log.i("checkClientTrusted", Arrays.toString(chain));
+        Log.i("checkClientTrusted", authType);
     }
 
     @SuppressLint("TrustAllX509TrustManager")
     @Override
     public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+        Log.i("checkServerTrusted", Arrays.toString(chain));
+        Log.i("checkServerTrusted", authType);
 
     }
 
@@ -33,6 +38,10 @@ class CustomX509TrustManager implements javax.net.ssl.X509TrustManager
     public void checkServerTrusted(X509Certificate[] chain, String authType, String host)
             throws CertificateException
     {
+        trustedCert = chain[0];
+        Log.i("checkServerTrusted", Arrays.toString(chain));
+        Log.i("checkServerTrusted", authType);
+        Log.i("checkServerTrusted", host);
     }
 
     @Override
