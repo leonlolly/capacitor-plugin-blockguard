@@ -160,7 +160,7 @@ public class NativeAPI {
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
 
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("PKIX");
             keyManagerFactory.init(this.keyStore, null);
 
             sslContext.init(keyManagerFactory.getKeyManagers(), trustManagers, null);
