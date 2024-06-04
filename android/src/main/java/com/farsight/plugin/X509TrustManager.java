@@ -35,12 +35,7 @@ class X509TrustManager implements javax.net.ssl.X509TrustManager
     @SuppressLint("TrustAllX509TrustManager")
     @Override
     public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-        // Check if the server certificate matches our trusted self-signed certificate
-        if (chain[0].equals(trustedCert)) {
-            return; // Trusted certificate
-        } else {
-            throw new CertificateException("Untrusted server certificate!");
-        }
+
     }
 
     @SuppressLint("TrustAllX509TrustManager")
@@ -48,11 +43,6 @@ class X509TrustManager implements javax.net.ssl.X509TrustManager
     public void checkServerTrusted(X509Certificate[] chain, String authType, String host)
             throws CertificateException
     {
-        if (chain[0].equals(trustedCert)) {
-            return;
-        } else {
-            throw new CertificateException("Untrusted server certificate!");
-        }
     }
 
     @Override
