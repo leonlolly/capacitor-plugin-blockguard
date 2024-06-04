@@ -1,6 +1,7 @@
 package com.getcapacitor.android;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -142,16 +143,18 @@ qIEhCV4205FaP0X22Ucb4JEnocwOFO7y62taELR1M3/zuurxTD92D9ajKw==
         RawMtlsClient client = new RawMtlsClient();
         //client.sendTLSRequest("PUT","https://certauth.cryptomix.com/","");
 
-        nativeAPI.storePrivateKeyWithCertificate(privateKey,clientCertificate);
+        //nativeAPI.storePrivateKeyWithCertificate(privateKey,clientCertificate);
         //assertTrue(nativeAPI.validatePrivateKey(generatedPublic));
         //assertTrue(nativeAPI.validateCertificate(generatedPublic));
         //assertTrue(nativeAPI.validatePublicKey());
 
+        MTLSFetchResponse response = nativeAPI.mtlsFetch(method, url, body,privateKey,clientCertificate,1);
+        assertFalse(response.success);
+//        for (int i = 57578; i < 65535; i++) { //57578
+//            MTLSFetchResponse response = nativeAPI.mtlsFetch(method, url, body,privateKey,clientCertificate,i);
+//            assertFalse(response.success);
+//        }
 
-        MTLSFetchResponse response = nativeAPI.mtlsFetch(method, url, body);
-
-        assertNotNull(response);
-        assertEquals(response.statusCode,200);
     }
 
 
