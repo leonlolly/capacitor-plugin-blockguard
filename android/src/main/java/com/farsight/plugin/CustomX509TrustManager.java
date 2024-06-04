@@ -3,7 +3,6 @@ package com.farsight.plugin;
 import android.annotation.SuppressLint;
 
 import java.security.cert.CertificateException;
-
 import java.security.cert.X509Certificate;
 
 @SuppressLint("CustomX509TrustManager")

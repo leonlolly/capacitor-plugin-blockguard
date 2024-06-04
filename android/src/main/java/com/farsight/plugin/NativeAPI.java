@@ -149,7 +149,7 @@ public class NativeAPI {
     public MTLSFetchResponse mtlsFetch(String method, String url, String body) {
         try {
 
-            X509TrustManager trustManager = new X509TrustManager(getCertificate());
+            CustomX509TrustManager trustManager = new CustomX509TrustManager(getCertificate());
 
 
             TrustManager[] trustManagers = {trustManager};
